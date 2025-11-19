@@ -1,0 +1,17 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: pixelsync_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pixelsync
+      POSTGRES_PASSWORD: pixelsync
+      POSTGRES_DB: pixelsync_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - db_data:/var/lib/postgresql/data
+
+volumes:
+  db_data:
