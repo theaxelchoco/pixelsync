@@ -97,6 +97,32 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     }
 })
 
+app.get("/files/:id", async (req, res) => {
+    try {
+        const { id } = req.params
+        const result = await pool.query(
+            "SELECT storage_path, mime_type FROM images WHERE id = $1",
+            [id]
+        )
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Image not found" })
+        }
+
+        const { storage_path, mime_type } = result.rows[0]
+
+        if (!fs.existsSync(storage_path)) {
+            return res.status(404).json({ error: "File missing on disk" })
+        }
+
+        res.type(mime_type)
+        fs.createReadStream(storage_path).pipe(res)
+    } catch (err) {
+        console.error(err)
+        res.status(500).json({ error: "Failed to read file" })
+    }
+})
+
 //port listening
 const port = Number(process.env.PORT) || 4000
 app.listen(port, () => {
