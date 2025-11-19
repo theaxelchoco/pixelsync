@@ -6,6 +6,7 @@ import fs from "fs"
 import { fileURLToPath } from "url"
 import dotenv from "dotenv"
 import pkg from "pg"
+import sharp from "sharp"
 
 dotenv.config()
 const { Pool } = pkg
@@ -122,6 +123,89 @@ app.get("/files/:id", async (req, res) => {
         res.status(500).json({ error: "Failed to read file" })
     }
 })
+
+app.post("/images/:id/crop", async (req, res) => {
+    try {
+        const { id } = req.params
+        const { x, y, width, height } = req.body
+
+        if (
+            typeof x !== "number" ||
+            typeof y !== "number" ||
+            typeof width !== "number" ||
+            typeof height !== "number"
+        ) {
+            return res.status(400).json({ error: "Invalid crop data" })
+        }
+
+        const result = await pool.query(
+            "SELECT filename, storage_path, mime_type, size_bytes FROM images WHERE id = $1",
+            [id]
+        )
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Image not found" })
+        }
+
+        const row = result.rows[0]
+        const inputPath = row.storage_path
+
+        if (!fs.existsSync(inputPath)) {
+            return res.status(404).json({ error: "File missing on disk" })
+        }
+
+        const img = sharp(inputPath)
+        const meta = await img.metadata()
+
+        const imgWidth = meta.width || 0
+        const imgHeight = meta.height || 0
+
+        if (!imgWidth || !imgHeight) {
+            return res.status(500).json({ error: "Missing image dimensions" })
+        }
+
+        const cropRegion = {
+            left: Math.round(x * imgWidth),
+            top: Math.round(y * imgHeight),
+            width: Math.round(width * imgWidth),
+            height: Math.round(height * imgHeight)
+        }
+
+        const newBuffer = await img.extract(cropRegion).toBuffer()
+
+        const baseName = path.basename(row.filename)
+        const newFilename = `crop_${Date.now()}_${baseName}`
+        const newPath = path.join(storageRoot, newFilename)
+
+        fs.writeFileSync(newPath, newBuffer)
+
+        const stats = fs.statSync(newPath)
+
+        const insertQuery = `
+      INSERT INTO images (filename, mime_type, size_bytes, storage_path, is_corrupted)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `
+        const values = [
+            newFilename,
+            row.mime_type,
+            stats.size,
+            newPath,
+            false
+        ]
+
+        const inserted = await pool.query(insertQuery, values)
+
+        res.status(201).json({
+            message: "Cropped image created",
+            image: inserted.rows[0]
+        })
+    } catch (err) {
+        console.error(err)
+        res.status(500).json({ error: "Crop failed" })
+    }
+})
+
 
 //port listening
 const port = Number(process.env.PORT) || 4000

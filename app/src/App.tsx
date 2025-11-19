@@ -39,6 +39,8 @@ function App() {
   } | null>(null)
 
   const selectionStartRef = useRef<{ x: number; y: number } | null>(null)
+  const canvasRef = useRef<HTMLDivElement | null>(null)
+  const imgRef = useRef<HTMLImageElement | null>(null)
 
   const API_BASE = "http://localhost:4000"
 
@@ -167,6 +169,66 @@ function App() {
     selectionStartRef.current = null
   }
 
+  const handleCreateFromSelection = async () => {
+    if (!selectedImage || !selection || !canvasRef.current || !imgRef.current)
+      return
+
+    const canvasRect = canvasRef.current.getBoundingClientRect()
+    const imgRect = imgRef.current.getBoundingClientRect()
+
+    // selection in page coords
+    const selLeft = canvasRect.left + selection.x
+    const selTop = canvasRect.top + selection.y
+    const selRight = selLeft + selection.width
+    const selBottom = selTop + selection.height
+
+    // intersect selection with image box
+    const interLeft = Math.max(selLeft, imgRect.left)
+    const interTop = Math.max(selTop, imgRect.top)
+    const interRight = Math.min(selRight, imgRect.right)
+    const interBottom = Math.min(selBottom, imgRect.bottom)
+
+    const interWidth = interRight - interLeft
+    const interHeight = interBottom - interTop
+
+    if (interWidth <= 0 || interHeight <= 0) {
+      addLog("Selection does not overlap image")
+      return
+    }
+
+    const normX = (interLeft - imgRect.left) / imgRect.width
+    const normY = (interTop - imgRect.top) / imgRect.height
+    const normW = interWidth / imgRect.width
+    const normH = interHeight / imgRect.height
+
+    try {
+      const res = await fetch(`${API_BASE}/images/${selectedImage.id}/crop`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          x: normX,
+          y: normY,
+          width: normW,
+          height: normH
+        })
+      })
+
+      if (!res.ok) {
+        addLog("Crop failed")
+        return
+      }
+
+      const payload = await res.json()
+      addLog(`Created cropped image ${payload.image.filename}`)
+      setSelection(null)
+      await fetchImages()
+    } catch (err) {
+      console.error(err)
+      addLog("Crop request crashed")
+    }
+  }
+
+
 
   const resetView = () => {
     setZoom(1)
@@ -180,6 +242,8 @@ function App() {
   const zoomOut = () => {
     setZoom(prev => Math.max(prev / 1.2, 0.2))
   }
+
+  
 
 
   return (
@@ -291,6 +355,12 @@ function App() {
                 >
                   {selectionMode ? "Selection on" : "Selection off"}
                 </button>
+                <button
+                  disabled={!selection}
+                  onClick={handleCreateFromSelection}
+                >
+                  Create image
+                </button>
               </div>
 
             </div>
@@ -299,6 +369,7 @@ function App() {
               className={
                 isPanning ? "viewer-canvas panning" : "viewer-canvas"
               }
+              ref={canvasRef}
               onWheel={handleWheel}
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
@@ -307,6 +378,7 @@ function App() {
             >
               <div className="viewer-inner">
                 <img
+                  ref={imgRef}
                   src={`${API_BASE}/files/${selectedImage.id}`}
                   alt={selectedImage.filename}
                   className="viewer-img"
