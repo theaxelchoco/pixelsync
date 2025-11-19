@@ -48,11 +48,33 @@ function App() {
   const canvasRef = useRef<HTMLDivElement | null>(null)
   const imgRef = useRef<HTMLImageElement | null>(null)
 
+  const [typeFilter, setTypeFilter] = useState<"all" | "jpeg" | "png" | "tiff">(
+    "all"
+  )
+
   const API_BASE = "http://localhost:4000"
 
   const addLog = (message: string) => {
     setLogs(prev => [{ id: Date.now(), message }, ...prev])
   }
+
+  const filteredImages = images.filter(img => {
+    if (typeFilter === "all") return true
+
+    const mime = img.mime_type.toLowerCase()
+
+    if (typeFilter === "jpeg") {
+      return mime.includes("jpeg") || mime.includes("jpg")
+    }
+    if (typeFilter === "png") {
+      return mime.includes("png")
+    }
+    if (typeFilter === "tiff") {
+      return mime.includes("tiff") || mime.includes("tif")
+    }
+
+    return true
+  })
 
   const fetchImages = async () => {
     try {
@@ -303,28 +325,64 @@ function App() {
 
       {/* Center panel: gallery + single viewer */}
       <div className="center-panel">
-        <div className="tabs">
-          <button
-            className={activeTab === "gallery" ? "tab active" : "tab"}
-            onClick={() => setActiveTab("gallery")}
-          >
-            Gallery
-          </button>
-          <button
-            className={activeTab === "single" ? "tab active" : "tab"}
-            onClick={() => setActiveTab("single")}
-            disabled={!selectedImage}
-          >
-            Single viewer
-          </button>
+        <div className="top-row">
+          <div className="tabs">
+            <button
+              className={activeTab === "gallery" ? "tab active" : "tab"}
+              onClick={() => setActiveTab("gallery")}
+            >
+              Gallery
+            </button>
+            <button
+              className={activeTab === "single" ? "tab active" : "tab"}
+              onClick={() => setActiveTab("single")}
+              disabled={!selectedImage}
+            >
+              Single viewer
+            </button>
+          </div>
+
+          <div className="filters">
+            <button
+              className={typeFilter === "all" ? "chip active" : "chip"}
+              onClick={() => setTypeFilter("all")}
+            >
+              All
+            </button>
+            <button
+              className={typeFilter === "jpeg" ? "chip active" : "chip"}
+              onClick={() => setTypeFilter("jpeg")}
+            >
+              JPEG
+            </button>
+            <button
+              className={typeFilter === "png" ? "chip active" : "chip"}
+              onClick={() => setTypeFilter("png")}
+            >
+              PNG
+            </button>
+            <button
+              className={typeFilter === "tiff" ? "chip active" : "chip"}
+              onClick={() => setTypeFilter("tiff")}
+            >
+              TIFF
+            </button>
+          </div>
         </div>
 
         {activeTab === "gallery" && (
           <div className="gallery">
-            {images.length === 0 && <p className="empty">No images yet</p>}
+            <div className="gallery-header">
+              <span>
+                Showing {filteredImages.length} of {images.length} image
+                {images.length !== 1 && "s"}
+              </span>
+            </div>
+
+            {filteredImages.length === 0 && <p className="empty">No images match this filter</p>}
 
             <div className="gallery-grid">
-              {images.map(img => (
+              {filteredImages.map(img => (
                 <button
                   key={img.id}
                   className={

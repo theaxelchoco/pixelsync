@@ -93,6 +93,41 @@ body {
   gap: 12px;
 }
 
+.top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+}
+
+.chip {
+  border-radius: 999px;
+  border: 1px solid #374151;
+  background: #020617;
+  color: #e5e7eb;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.chip.active {
+  background: #4f46e5;
+  border-color: #4f46e5;
+}
+
+.gallery-header {
+  margin-bottom: 6px;
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+
 .tabs {
   display: flex;
   gap: 8px;
