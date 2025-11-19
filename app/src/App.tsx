@@ -27,6 +27,12 @@ function App() {
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   const [isPanning, setIsPanning] = useState(false)
 
+    const [uploadSummary, setUploadSummary] = useState<{
+      totalFiles: number
+      totalSize: number
+      corruptedCount: number
+    } | null>(null)
+
   const panStartRef = useRef<{ x: number; y: number } | null>(null)
   const offsetStartRef = useRef<{ x: number; y: number } | null>(null)
 
@@ -64,40 +70,49 @@ function App() {
     fetchImages()
   }, [])
 
-  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files
-    if (!files || files.length === 0) return
+    const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const files = event.target.files
+      if (!files || files.length === 0) return
 
-    const file = files[0]
+      const formData = new FormData()
+      Array.from(files).forEach(file => formData.append("files", file))
 
-    const formData = new FormData()
-    formData.append("file", file)
+      setIsUploading(true)
+      try {
+        const res = await fetch(`${API_BASE}/upload/batch`, {
+          method: "POST",
+          body: formData
+        })
 
-    setIsUploading(true)
-    try {
-      const res = await fetch(`${API_BASE}/upload`, {
-        method: "POST",
-        body: formData
-      })
+        if (!res.ok) {
+          addLog("Batch upload failed")
+          return
+        }
 
-      if (!res.ok) {
-        addLog("Upload failed")
-        return
+        const payload = await res.json()
+
+        setUploadSummary({
+          totalFiles: payload.totalFiles,
+          totalSize: payload.totalSize,
+          corruptedCount: payload.corruptedCount ?? 0
+        })
+
+        addLog(
+          `Uploaded ${payload.totalFiles} file(s), ${(payload.totalSize / 1024).toFixed(
+            1
+          )} KB, corrupted: ${payload.corruptedCount ?? 0}`
+        )
+
+        await fetchImages()
+      } catch (err) {
+        console.error(err)
+        addLog("Batch upload crashed")
+      } finally {
+        setIsUploading(false)
+        event.target.value = ""
       }
-
-      const payload = await res.json()
-      addLog(`Uploaded ${payload.image.filename}`)
-
-      await fetchImages()
-    } catch (err) {
-      console.error(err)
-      addLog("Upload crashed")
-    } finally {
-      setIsUploading(false)
-      // allow same file to be picked again if needed
-      event.target.value = ""
     }
-  }
+
 
     const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
     event.preventDefault()
@@ -253,11 +268,29 @@ function App() {
         <h2>PixelSync</h2>
         <p className="sub">Upload images to the server</p>
 
+        {uploadSummary && (
+          <div className="upload-summary">
+            <div>
+              <strong>{uploadSummary.totalFiles}</strong> file
+              {uploadSummary.totalFiles !== 1 && "s"} uploaded
+            </div>
+            <div>
+              Total size:{" "}
+              {(uploadSummary.totalSize / 1024).toFixed(1)} KB
+            </div>
+            <div>
+              Corrupted: {uploadSummary.corruptedCount}
+            </div>
+          </div>
+        )}
+
+
         <label className="upload-button">
-          <span>{isUploading ? "Uploading..." : "Choose image"}</span>
+          <span>{isUploading ? "Uploading..." : "Choose images"}</span>
           <input
             type="file"
             accept=".png,.jpg,.jpeg,.tif,.tiff"
+            multiple
             onChange={handleUpload}
             disabled={isUploading}
           />

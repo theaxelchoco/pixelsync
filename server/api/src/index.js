@@ -44,6 +44,7 @@ const storage = multer.diskStorage({
 })
 
 const upload = multer({ storage })
+const multiUpload = multer({ storage })
 
 //API routes
 app.get("/health", async (req, res) => {
@@ -95,6 +96,50 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     } catch (err) {
         console.error(err)
         res.status(500).json({ error: "Upload failed" })
+    }
+})
+
+app.post("/upload/batch", multiUpload.array("files", 50), async (req, res) => {
+    try {
+        const files = req.files || []
+
+        if (!files.length) {
+            return res.status(400).json({ error: "No files uploaded" })
+        }
+
+        let totalSize = 0
+        const insertedImages = []
+
+        for (const file of files) {
+            totalSize += file.size
+
+            const insertQuery = `
+        INSERT INTO images (filename, mime_type, size_bytes, storage_path, is_corrupted)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING *
+      `
+            const values = [
+                file.originalname,
+                file.mimetype,
+                file.size,
+                file.path,
+                false
+            ]
+
+            const result = await pool.query(insertQuery, values)
+            insertedImages.push(result.rows[0])
+        }
+
+        res.status(201).json({
+            message: "Batch upload complete",
+            totalFiles: files.length,
+            totalSize,
+            corruptedCount: 0, // placeholder for now
+            images: insertedImages
+        })
+    } catch (err) {
+        console.error(err)
+        res.status(500).json({ error: "Batch upload failed" })
     }
 })
 

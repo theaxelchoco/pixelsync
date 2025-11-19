@@ -60,6 +60,20 @@ body {
   display: none;
 }
 
+.upload-summary {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #1f2937;
+  background: #020617;
+  font-size: 0.8rem;
+  color: #d1d5db;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+
 .refresh-button {
   margin-top: 8px;
   padding: 8px 12px;
