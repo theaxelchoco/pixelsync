@@ -30,6 +30,16 @@ function App() {
   const panStartRef = useRef<{ x: number; y: number } | null>(null)
   const offsetStartRef = useRef<{ x: number; y: number } | null>(null)
 
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selection, setSelection] = useState<{
+    x: number
+    y: number
+    width: number
+    height: number
+  } | null>(null)
+
+  const selectionStartRef = useRef<{ x: number; y: number } | null>(null)
+
   const API_BASE = "http://localhost:4000"
 
   const addLog = (message: string) => {
@@ -102,12 +112,45 @@ function App() {
   }
 
   const handleMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
-    setIsPanning(true)
-    panStartRef.current = { x: event.clientX, y: event.clientY }
-    offsetStartRef.current = { ...offset }
+    const rect = event.currentTarget.getBoundingClientRect()
+    const x = event.clientX - rect.left
+    const y = event.clientY - rect.top
+
+    if (selectionMode) {
+      // start selection
+      selectionStartRef.current = { x, y }
+      setSelection(null)
+    } else {
+      // start panning
+      setIsPanning(true)
+      panStartRef.current = { x: event.clientX, y: event.clientY }
+      offsetStartRef.current = { ...offset }
+    }
   }
 
   const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (selectionMode) {
+      if (!selectionStartRef.current) return
+
+      const rect = event.currentTarget.getBoundingClientRect()
+      const x = event.clientX - rect.left
+      const y = event.clientY - rect.top
+
+      const start = selectionStartRef.current
+      const width = x - start.x
+      const height = y - start.y
+
+      const normalized = {
+        x: width >= 0 ? start.x : x,
+        y: height >= 0 ? start.y : y,
+        width: Math.abs(width),
+        height: Math.abs(height)
+      }
+
+      setSelection(normalized)
+      return
+    }
+
     if (!isPanning || !panStartRef.current || !offsetStartRef.current) return
 
     const dx = event.clientX - panStartRef.current.x
@@ -121,7 +164,9 @@ function App() {
 
   const handleMouseUp = () => {
     setIsPanning(false)
+    selectionStartRef.current = null
   }
+
 
   const resetView = () => {
     setZoom(1)
@@ -235,7 +280,19 @@ function App() {
                 <span>{Math.round(zoom * 100)}%</span>
                 <button onClick={zoomIn}>+</button>
                 <button onClick={resetView}>Reset</button>
+                <button
+                  className={selectionMode ? "toggle active" : "toggle"}
+                  onClick={() => {
+                    setSelectionMode(prev => !prev)
+                    setSelection(null)
+                    selectionStartRef.current = null
+                    setIsPanning(false)
+                  }}
+                >
+                  {selectionMode ? "Selection on" : "Selection off"}
+                </button>
               </div>
+
             </div>
 
             <div
@@ -260,7 +317,20 @@ function App() {
                   draggable={false}
                 />
               </div>
+
+              {selection && (
+                <div
+                  className="selection-rect"
+                  style={{
+                    left: selection.x,
+                    top: selection.y,
+                    width: selection.width,
+                    height: selection.height
+                  }}
+                />
+              )}
             </div>
+
 
             <p className="hint">Scroll to zoom. Drag to pan.</p>
           </div>

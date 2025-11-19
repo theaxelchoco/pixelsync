@@ -293,6 +293,24 @@ body {
   transition: transform 0.02s linear;
 }
 
+.viewer-controls .toggle {
+  margin-left: 8px;
+}
+
+.viewer-controls .toggle.active {
+  border-color: #4f46e5;
+  background: #111827;
+}
+
+.selection-rect {
+  position: absolute;
+  border: 1px solid #4f46e5;
+  background: rgba(79, 70, 229, 0.18);
+  pointer-events: none;
+  border-radius: 4px;
+}
+
+
 .hint {
   margin: 0;
   font-size: 0.75rem;
