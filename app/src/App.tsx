@@ -22,6 +22,8 @@ function App() {
   const [activeTab, setActiveTab] = useState<"gallery" | "single">("gallery")
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [isUploading, setIsUploading] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [gallerySelectionMode, setGallerySelectionMode] = useState(false)
 
   const [zoom, setZoom] = useState(1)
   const [offset, setOffset] = useState({ x: 0, y: 0 })
@@ -77,10 +79,13 @@ function App() {
   })
 
   const fetchImages = async () => {
-    try {
+     try {
       const res = await fetch(`${API_BASE}/images`)
       const data = await res.json()
       setImages(data)
+      setSelectedIds(prev =>
+        prev.filter(id => data.some((img: ImageMeta) => img.id === id))
+      )
       addLog(`Loaded ${data.length} images from server`)
     } catch (err) {
       console.error(err)
@@ -265,6 +270,27 @@ function App() {
     }
   }
 
+  const handleThumbClick = (
+    img: ImageMeta,
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    // always update the "current" image for the viewer
+    setSelectedImage(img)
+
+    setSelectedIds(prev => {
+      if (gallerySelectionMode) {
+        // multi-select: toggle membership
+        if (prev.includes(img.id)) {
+          return prev.filter(id => id !== img.id)
+        }
+        return [...prev, img.id]
+      }
+
+      // normal mode: single select
+      return [img.id]
+    })
+  }
+
 
 
   const resetView = () => {
@@ -342,30 +368,41 @@ function App() {
             </button>
           </div>
 
-          <div className="filters">
+          <div className="right-controls">
+            <div className="filters">
+              <button
+                className={typeFilter === "all" ? "chip active" : "chip"}
+                onClick={() => setTypeFilter("all")}
+              >
+                All
+              </button>
+              <button
+                className={typeFilter === "jpeg" ? "chip active" : "chip"}
+                onClick={() => setTypeFilter("jpeg")}
+              >
+                JPEG
+              </button>
+              <button
+                className={typeFilter === "png" ? "chip active" : "chip"}
+                onClick={() => setTypeFilter("png")}
+              >
+                PNG
+              </button>
+              <button
+                className={typeFilter === "tiff" ? "chip active" : "chip"}
+                onClick={() => setTypeFilter("tiff")}
+              >
+                TIFF
+              </button>
+            </div>
+
             <button
-              className={typeFilter === "all" ? "chip active" : "chip"}
-              onClick={() => setTypeFilter("all")}
+              className={
+                gallerySelectionMode ? "chip selection-toggle active" : "chip selection-toggle"
+              }
+              onClick={() => setGallerySelectionMode(prev => !prev)}
             >
-              All
-            </button>
-            <button
-              className={typeFilter === "jpeg" ? "chip active" : "chip"}
-              onClick={() => setTypeFilter("jpeg")}
-            >
-              JPEG
-            </button>
-            <button
-              className={typeFilter === "png" ? "chip active" : "chip"}
-              onClick={() => setTypeFilter("png")}
-            >
-              PNG
-            </button>
-            <button
-              className={typeFilter === "tiff" ? "chip active" : "chip"}
-              onClick={() => setTypeFilter("tiff")}
-            >
-              TIFF
+              {gallerySelectionMode ? "Selection mode on" : "Selection mode off"}
             </button>
           </div>
         </div>
@@ -377,6 +414,18 @@ function App() {
                 Showing {filteredImages.length} of {images.length} image
                 {images.length !== 1 && "s"}
               </span>
+
+               <span className="selected-info">
+                {selectedIds.length} selected
+                {selectedIds.length > 0 && (
+                  <button
+                    className="clear-selection"
+                    onClick={() => setSelectedIds([])}
+                  >
+                    Clear
+                  </button>
+                )}
+              </span>
             </div>
 
             {filteredImages.length === 0 && <p className="empty">No images match this filter</p>}
@@ -386,13 +435,11 @@ function App() {
                 <button
                   key={img.id}
                   className={
-                    selectedImage?.id === img.id
-                      ? "thumb-card selected"
-                      : "thumb-card"
+                    selectedIds.includes(img.id) ? "thumb-card selected" : "thumb-card"
                   }
-                  onClick={() => {
+                  onClick={event => {
                     // single click just selects
-                    setSelectedImage(img)
+                    handleThumbClick(img,event)
                   }}
                   onDoubleClick={() => {
                     // double click selects + switches tab

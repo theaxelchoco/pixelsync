@@ -121,11 +121,46 @@ body {
   border-color: #4f46e5;
 }
 
+.right-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.selection-toggle {
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+
 .gallery-header {
   margin-bottom: 6px;
   font-size: 0.8rem;
   color: #9ca3af;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
 }
+
+.selected-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.clear-selection {
+  border-radius: 999px;
+  border: 1px solid #374151;
+  background: transparent;
+  color: #e5e7eb;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+
+
 
 
 .tabs {
