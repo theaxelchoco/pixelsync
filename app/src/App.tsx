@@ -1,250 +1,256 @@
-import React, { useEffect, useState, useRef } from "react"
-import "./App.css"
+import React, { useEffect, useState, useRef } from "react";
+import "./App.css";
 
 type ImageMeta = {
-  id: string
-  filename: string
-  mime_type: string
-  size_bytes: number
-  storage_path: string
-  is_corrupted: boolean
-  created_at: string
-}
+  id: string;
+  filename: string;
+  mime_type: string;
+  size_bytes: number;
+  storage_path: string;
+  is_corrupted: boolean;
+  created_at: string;
+};
 
 type LogEntry = {
-  id: number
-  message: string
-}
-
-
-
+  id: number;
+  message: string;
+};
 
 function App() {
-  const [images, setImages] = useState<ImageMeta[]>([])
-  const [selectedImage, setSelectedImage] = useState<ImageMeta | null>(null)
-  const [activeTab, setActiveTab] = useState<"gallery" | "single">("gallery")
-  const [logs, setLogs] = useState<LogEntry[]>([])
-  const [isUploading, setIsUploading] = useState(false)
-  const [selectedIds, setSelectedIds] = useState<string[]>([])
-  const [gallerySelectionMode, setGallerySelectionMode] = useState(false)
+  const [images, setImages] = useState<ImageMeta[]>([]);
+  const [selectedImage, setSelectedImage] = useState<ImageMeta | null>(null);
+  const [activeTab, setActiveTab] = useState<"gallery" | "single">("gallery");
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [gallerySelectionMode, setGallerySelectionMode] = useState(false);
 
-  const [zoom, setZoom] = useState(1)
-  const [offset, setOffset] = useState({ x: 0, y: 0 })
-  const [isPanning, setIsPanning] = useState(false)
+  const [zoom, setZoom] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
 
-    const [uploadSummary, setUploadSummary] = useState<{
-      totalFiles: number
-      totalSize: number
-      corruptedCount: number
-    } | null>(null)
+  const [uploadSummary, setUploadSummary] = useState<{
+    totalFiles: number;
+    totalSize: number;
+    corruptedCount: number;
+  } | null>(null);
 
-  const panStartRef = useRef<{ x: number; y: number } | null>(null)
-  const offsetStartRef = useRef<{ x: number; y: number } | null>(null)
+  const panStartRef = useRef<{ x: number; y: number } | null>(null);
+  const offsetStartRef = useRef<{ x: number; y: number } | null>(null);
 
-  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectionMode, setSelectionMode] = useState(false);
   const [selection, setSelection] = useState<{
-    x: number
-    y: number
-    width: number
-    height: number
-  } | null>(null)
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
 
-  const selectionStartRef = useRef<{ x: number; y: number } | null>(null)
-  const canvasRef = useRef<HTMLDivElement | null>(null)
-  const imgRef = useRef<HTMLImageElement | null>(null)
+  const selectionStartRef = useRef<{ x: number; y: number } | null>(null);
+  const canvasRef = useRef<HTMLDivElement | null>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
 
   const [typeFilter, setTypeFilter] = useState<"all" | "jpeg" | "png" | "tiff">(
     "all"
-  )
+  );
 
-  const API_BASE = "http://localhost:4000"
+  const [syncSummary, setSyncSummary] = useState<{
+    totalDbBefore: number;
+    totalDisk: number;
+    addedFromDisk: number;
+    markedMissing: number;
+    healed: number;
+  } | null>(null);
+
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const API_BASE = "http://localhost:4000";
 
   const addLog = (message: string) => {
-    setLogs(prev => [{ id: Date.now(), message }, ...prev])
-  }
+    setLogs((prev) => [{ id: Date.now(), message }, ...prev]);
+  };
 
-  const filteredImages = images.filter(img => {
-    if (typeFilter === "all") return true
+  const filteredImages = images.filter((img) => {
+    if (typeFilter === "all") return true;
 
-    const mime = img.mime_type.toLowerCase()
+    const mime = img.mime_type.toLowerCase();
 
     if (typeFilter === "jpeg") {
-      return mime.includes("jpeg") || mime.includes("jpg")
+      return mime.includes("jpeg") || mime.includes("jpg");
     }
     if (typeFilter === "png") {
-      return mime.includes("png")
+      return mime.includes("png");
     }
     if (typeFilter === "tiff") {
-      return mime.includes("tiff") || mime.includes("tif")
+      return mime.includes("tiff") || mime.includes("tif");
     }
 
-    return true
-  })
+    return true;
+  });
 
   const fetchImages = async () => {
-     try {
-      const res = await fetch(`${API_BASE}/images`)
-      const data = await res.json()
-      setImages(data)
-      setSelectedIds(prev =>
-        prev.filter(id => data.some((img: ImageMeta) => img.id === id))
-      )
-      addLog(`Loaded ${data.length} images from server`)
+    try {
+      const res = await fetch(`${API_BASE}/images`);
+      const data = await res.json();
+      setImages(data);
+      setSelectedIds((prev) =>
+        prev.filter((id) => data.some((img: ImageMeta) => img.id === id))
+      );
+      addLog(`Loaded ${data.length} images from server`);
     } catch (err) {
-      console.error(err)
-      addLog("Failed to load images")
+      console.error(err);
+      addLog("Failed to load images");
     }
-  }
+  };
 
   useEffect(() => {
-    fetchImages()
-  }, [])
+    fetchImages();
+  }, []);
 
-    const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const files = event.target.files
-      if (!files || files.length === 0) return
+  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
 
-      const formData = new FormData()
-      Array.from(files).forEach(file => formData.append("files", file))
+    const formData = new FormData();
+    Array.from(files).forEach((file) => formData.append("files", file));
 
-      setIsUploading(true)
-      try {
-        const res = await fetch(`${API_BASE}/upload/batch`, {
-          method: "POST",
-          body: formData
-        })
+    setIsUploading(true);
+    try {
+      const res = await fetch(`${API_BASE}/upload/batch`, {
+        method: "POST",
+        body: formData,
+      });
 
-        if (!res.ok) {
-          addLog("Batch upload failed")
-          return
-        }
-
-        const payload = await res.json()
-
-        setUploadSummary({
-          totalFiles: payload.totalFiles,
-          totalSize: payload.totalSize,
-          corruptedCount: payload.corruptedCount ?? 0
-        })
-
-        addLog(
-          `Uploaded ${payload.totalFiles} file(s), ${(payload.totalSize / 1024).toFixed(
-            1
-          )} KB, corrupted: ${payload.corruptedCount ?? 0}`
-        )
-
-        await fetchImages()
-      } catch (err) {
-        console.error(err)
-        addLog("Batch upload crashed")
-      } finally {
-        setIsUploading(false)
-        event.target.value = ""
+      if (!res.ok) {
+        addLog("Batch upload failed");
+        return;
       }
+
+      const payload = await res.json();
+
+      setUploadSummary({
+        totalFiles: payload.totalFiles,
+        totalSize: payload.totalSize,
+        corruptedCount: payload.corruptedCount ?? 0,
+      });
+
+      addLog(
+        `Uploaded ${payload.totalFiles} file(s), ${(
+          payload.totalSize / 1024
+        ).toFixed(1)} KB, corrupted: ${payload.corruptedCount ?? 0}`
+      );
+
+      await fetchImages();
+    } catch (err) {
+      console.error(err);
+      addLog("Batch upload crashed");
+    } finally {
+      setIsUploading(false);
+      event.target.value = "";
     }
+  };
 
+  const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    event.preventDefault();
 
-    const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
-    event.preventDefault()
+    const delta = -event.deltaY;
+    const factor = delta > 0 ? 1.1 : 0.9;
 
-    const delta = -event.deltaY
-    const factor = delta > 0 ? 1.1 : 0.9
-
-    setZoom(prev => {
-      let next = prev * factor
-      if (next < 0.2) next = 0.2
-      if (next > 5) next = 5
-      return Number(next.toFixed(2))
-    })
-  }
+    setZoom((prev) => {
+      let next = prev * factor;
+      if (next < 0.2) next = 0.2;
+      if (next > 5) next = 5;
+      return Number(next.toFixed(2));
+    });
+  };
 
   const handleMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect()
-    const x = event.clientX - rect.left
-    const y = event.clientY - rect.top
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
 
     if (selectionMode) {
       // start selection
-      selectionStartRef.current = { x, y }
-      setSelection(null)
+      selectionStartRef.current = { x, y };
+      setSelection(null);
     } else {
       // start panning
-      setIsPanning(true)
-      panStartRef.current = { x: event.clientX, y: event.clientY }
-      offsetStartRef.current = { ...offset }
+      setIsPanning(true);
+      panStartRef.current = { x: event.clientX, y: event.clientY };
+      offsetStartRef.current = { ...offset };
     }
-  }
+  };
 
   const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
     if (selectionMode) {
-      if (!selectionStartRef.current) return
+      if (!selectionStartRef.current) return;
 
-      const rect = event.currentTarget.getBoundingClientRect()
-      const x = event.clientX - rect.left
-      const y = event.clientY - rect.top
+      const rect = event.currentTarget.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
 
-      const start = selectionStartRef.current
-      const width = x - start.x
-      const height = y - start.y
+      const start = selectionStartRef.current;
+      const width = x - start.x;
+      const height = y - start.y;
 
       const normalized = {
         x: width >= 0 ? start.x : x,
         y: height >= 0 ? start.y : y,
         width: Math.abs(width),
-        height: Math.abs(height)
-      }
+        height: Math.abs(height),
+      };
 
-      setSelection(normalized)
-      return
+      setSelection(normalized);
+      return;
     }
 
-    if (!isPanning || !panStartRef.current || !offsetStartRef.current) return
+    if (!isPanning || !panStartRef.current || !offsetStartRef.current) return;
 
-    const dx = event.clientX - panStartRef.current.x
-    const dy = event.clientY - panStartRef.current.y
+    const dx = event.clientX - panStartRef.current.x;
+    const dy = event.clientY - panStartRef.current.y;
 
     setOffset({
       x: offsetStartRef.current.x + dx,
-      y: offsetStartRef.current.y + dy
-    })
-  }
+      y: offsetStartRef.current.y + dy,
+    });
+  };
 
   const handleMouseUp = () => {
-    setIsPanning(false)
-    selectionStartRef.current = null
-  }
+    setIsPanning(false);
+    selectionStartRef.current = null;
+  };
 
   const handleCreateFromSelection = async () => {
     if (!selectedImage || !selection || !canvasRef.current || !imgRef.current)
-      return
+      return;
 
-    const canvasRect = canvasRef.current.getBoundingClientRect()
-    const imgRect = imgRef.current.getBoundingClientRect()
+    const canvasRect = canvasRef.current.getBoundingClientRect();
+    const imgRect = imgRef.current.getBoundingClientRect();
 
     // selection in page coords
-    const selLeft = canvasRect.left + selection.x
-    const selTop = canvasRect.top + selection.y
-    const selRight = selLeft + selection.width
-    const selBottom = selTop + selection.height
+    const selLeft = canvasRect.left + selection.x;
+    const selTop = canvasRect.top + selection.y;
+    const selRight = selLeft + selection.width;
+    const selBottom = selTop + selection.height;
 
     // intersect selection with image box
-    const interLeft = Math.max(selLeft, imgRect.left)
-    const interTop = Math.max(selTop, imgRect.top)
-    const interRight = Math.min(selRight, imgRect.right)
-    const interBottom = Math.min(selBottom, imgRect.bottom)
+    const interLeft = Math.max(selLeft, imgRect.left);
+    const interTop = Math.max(selTop, imgRect.top);
+    const interRight = Math.min(selRight, imgRect.right);
+    const interBottom = Math.min(selBottom, imgRect.bottom);
 
-    const interWidth = interRight - interLeft
-    const interHeight = interBottom - interTop
+    const interWidth = interRight - interLeft;
+    const interHeight = interBottom - interTop;
 
     if (interWidth <= 0 || interHeight <= 0) {
-      addLog("Selection does not overlap image")
-      return
+      addLog("Selection does not overlap image");
+      return;
     }
 
-    const normX = (interLeft - imgRect.left) / imgRect.width
-    const normY = (interTop - imgRect.top) / imgRect.height
-    const normW = interWidth / imgRect.width
-    const normH = interHeight / imgRect.height
+    const normX = (interLeft - imgRect.left) / imgRect.width;
+    const normY = (interTop - imgRect.top) / imgRect.height;
+    const normW = interWidth / imgRect.width;
+    const normH = interHeight / imgRect.height;
 
     try {
       const res = await fetch(`${API_BASE}/images/${selectedImage.id}/crop`, {
@@ -254,104 +260,127 @@ function App() {
           x: normX,
           y: normY,
           width: normW,
-          height: normH
-        })
-      })
+          height: normH,
+        }),
+      });
 
       if (!res.ok) {
-        addLog("Crop failed")
-        return
+        addLog("Crop failed");
+        return;
       }
 
-      const payload = await res.json()
-      addLog(`Created cropped image ${payload.image.filename}`)
-      setSelection(null)
-      await fetchImages()
+      const payload = await res.json();
+      addLog(`Created cropped image ${payload.image.filename}`);
+      setSelection(null);
+      await fetchImages();
     } catch (err) {
-      console.error(err)
-      addLog("Crop request crashed")
+      console.error(err);
+      addLog("Crop request crashed");
     }
-  }
+  };
 
   const handleThumbClick = (
     img: ImageMeta,
     event: React.MouseEvent<HTMLButtonElement>
   ) => {
     // always update the "current" image for the viewer
-    setSelectedImage(img)
+    setSelectedImage(img);
 
-    setSelectedIds(prev => {
+    setSelectedIds((prev) => {
       if (gallerySelectionMode) {
         // multi-select: toggle membership
         if (prev.includes(img.id)) {
-          return prev.filter(id => id !== img.id)
+          return prev.filter((id) => id !== img.id);
         }
-        return [...prev, img.id]
+        return [...prev, img.id];
       }
 
       // normal mode: single select
-      return [img.id]
-    })
-  }
+      return [img.id];
+    });
+  };
 
   const handleExportSelected = async () => {
-    const ipc = (window as any).ipcRenderer
+    const ipc = (window as any).ipcRenderer;
 
     if (!ipc || typeof ipc.invoke !== "function") {
-      addLog("Export not available in this environment")
-      return
+      addLog("Export not available in this environment");
+      return;
     }
 
-    const selectedImages = images.filter(img => selectedIds.includes(img.id))
+    const selectedImages = images.filter((img) => selectedIds.includes(img.id));
 
     if (selectedImages.length === 0) {
-      addLog("No images selected for export")
-      return
+      addLog("No images selected for export");
+      return;
     }
 
     try {
       const result = await ipc.invoke(
         "pixelsync:export-images",
-        selectedImages.map(img => ({
+        selectedImages.map((img) => ({
           path: img.storage_path,
-          filename: img.filename
+          filename: img.filename,
         }))
-      )
+      );
 
       if (!result || !result.targetDir) {
-        addLog("Export canceled")
-        return
+        addLog("Export canceled");
+        return;
       }
 
       addLog(
         `Exported ${result.exported} file${
           result.exported !== 1 ? "s" : ""
         } to ${result.targetDir}`
-      )
+      );
     } catch (err) {
-      console.error(err)
-      addLog("Export failed")
+      console.error(err);
+      addLog("Export failed");
     }
-  }
+  };
 
+  const handleRunSync = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await fetch(`${API_BASE}/sync`, {
+        method: "POST",
+      });
 
+      if (!res.ok) {
+        addLog("Sync failed");
+        return;
+      }
 
+      const payload = await res.json();
+      setSyncSummary(payload);
+
+      addLog(
+        `Sync complete. Added ${payload.addedFromDisk}, marked missing ${payload.markedMissing}, healed ${payload.healed}`
+      );
+
+      // pull fresh images so UI matches server
+      await fetchImages();
+    } catch (err) {
+      console.error(err);
+      addLog("Sync request crashed");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const resetView = () => {
-    setZoom(1)
-    setOffset({ x: 0, y: 0 })
-  }
+    setZoom(1);
+    setOffset({ x: 0, y: 0 });
+  };
 
   const zoomIn = () => {
-    setZoom(prev => Math.min(prev * 1.2, 5))
-  }
+    setZoom((prev) => Math.min(prev * 1.2, 5));
+  };
 
   const zoomOut = () => {
-    setZoom(prev => Math.max(prev / 1.2, 0.2))
-  }
-
-  
-
+    setZoom((prev) => Math.max(prev / 1.2, 0.2));
+  };
 
   return (
     <div className="app-shell">
@@ -367,15 +396,35 @@ function App() {
               {uploadSummary.totalFiles !== 1 && "s"} uploaded
             </div>
             <div>
-              Total size:{" "}
-              {(uploadSummary.totalSize / 1024).toFixed(1)} KB
+              Total size: {(uploadSummary.totalSize / 1024).toFixed(1)} KB
             </div>
-            <div>
-              Corrupted: {uploadSummary.corruptedCount}
-            </div>
+            <div>Corrupted: {uploadSummary.corruptedCount}</div>
           </div>
         )}
 
+        <div className="sync-card">
+          <div className="sync-header">
+            <span>Sync control</span>
+            <button
+              className="sync-button"
+              onClick={handleRunSync}
+              disabled={isSyncing}
+            >
+              {isSyncing ? "Syncing..." : "Run sync"}
+            </button>
+          </div>
+          {syncSummary && (
+            <ul>
+              <li>
+                DB before: {syncSummary.totalDbBefore} rows, disk:{" "}
+                {syncSummary.totalDisk} files
+              </li>
+              <li>Added from disk: {syncSummary.addedFromDisk}</li>
+              <li>Marked missing: {syncSummary.markedMissing}</li>
+              <li>Healed: {syncSummary.healed}</li>
+            </ul>
+          )}
+        </div>
 
         <label className="upload-button">
           <span>{isUploading ? "Uploading..." : "Choose images"}</span>
@@ -442,11 +491,15 @@ function App() {
 
             <button
               className={
-                gallerySelectionMode ? "chip selection-toggle active" : "chip selection-toggle"
+                gallerySelectionMode
+                  ? "chip selection-toggle active"
+                  : "chip selection-toggle"
               }
-              onClick={() => setGallerySelectionMode(prev => !prev)}
+              onClick={() => setGallerySelectionMode((prev) => !prev)}
             >
-              {gallerySelectionMode ? "Selection mode on" : "Selection mode off"}
+              {gallerySelectionMode
+                ? "Selection mode on"
+                : "Selection mode off"}
             </button>
           </div>
         </div>
@@ -459,7 +512,7 @@ function App() {
                 {images.length !== 1 && "s"}
               </span>
 
-               <span className="selected-info">
+              <span className="selected-info">
                 {selectedIds.length} selected
                 {selectedIds.length > 0 && (
                   <>
@@ -476,28 +529,31 @@ function App() {
                       Export selected
                     </button>
                   </>
-                  
                 )}
               </span>
             </div>
 
-            {filteredImages.length === 0 && <p className="empty">No images match this filter</p>}
+            {filteredImages.length === 0 && (
+              <p className="empty">No images match this filter</p>
+            )}
 
             <div className="gallery-grid">
-              {filteredImages.map(img => (
+              {filteredImages.map((img) => (
                 <button
                   key={img.id}
                   className={
-                    selectedIds.includes(img.id) ? "thumb-card selected" : "thumb-card"
+                    selectedIds.includes(img.id)
+                      ? "thumb-card selected"
+                      : "thumb-card"
                   }
-                  onClick={event => {
+                  onClick={(event) => {
                     // single click just selects
-                    handleThumbClick(img,event)
+                    handleThumbClick(img, event);
                   }}
                   onDoubleClick={() => {
                     // double click selects + switches tab
-                    setSelectedImage(img)
-                    setActiveTab("single")
+                    setSelectedImage(img);
+                    setActiveTab("single");
                   }}
                 >
                   <div className="thumb-wrapper">
@@ -511,14 +567,15 @@ function App() {
                   <div className="image-meta">
                     <span>{img.mime_type}</span>
                     <span>{(img.size_bytes / 1024).toFixed(1)} KB</span>
-                    {img.is_corrupted && <span className="badge">corrupted</span>}
+                    {img.is_corrupted && (
+                      <span className="badge">corrupted</span>
+                    )}
                   </div>
                 </button>
               ))}
             </div>
           </div>
         )}
-
 
         {activeTab === "single" && selectedImage && (
           <div className="single-viewer">
@@ -538,10 +595,10 @@ function App() {
                 <button
                   className={selectionMode ? "toggle active" : "toggle"}
                   onClick={() => {
-                    setSelectionMode(prev => !prev)
-                    setSelection(null)
-                    selectionStartRef.current = null
-                    setIsPanning(false)
+                    setSelectionMode((prev) => !prev);
+                    setSelection(null);
+                    selectionStartRef.current = null;
+                    setIsPanning(false);
                   }}
                 >
                   {selectionMode ? "Selection on" : "Selection off"}
@@ -553,13 +610,10 @@ function App() {
                   Create image
                 </button>
               </div>
-
             </div>
 
             <div
-              className={
-                isPanning ? "viewer-canvas panning" : "viewer-canvas"
-              }
+              className={isPanning ? "viewer-canvas panning" : "viewer-canvas"}
               ref={canvasRef}
               onWheel={handleWheel}
               onMouseDown={handleMouseDown}
@@ -575,7 +629,7 @@ function App() {
                   className="viewer-img"
                   style={{
                     transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
-                    transformOrigin: "center center"
+                    transformOrigin: "center center",
                   }}
                   draggable={false}
                 />
@@ -588,17 +642,15 @@ function App() {
                     left: selection.x,
                     top: selection.y,
                     width: selection.width,
-                    height: selection.height
+                    height: selection.height,
                   }}
                 />
               )}
             </div>
 
-
             <p className="hint">Scroll to zoom. Drag to pan.</p>
           </div>
         )}
-
 
         {activeTab === "single" && !selectedImage && (
           <div className="single-viewer empty">
@@ -611,13 +663,13 @@ function App() {
       <div className="bottom-panel">
         <h3>Activity log</h3>
         <ul>
-          {logs.map(log => (
+          {logs.map((log) => (
             <li key={log.id}>{log.message}</li>
           ))}
         </ul>
       </div>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;

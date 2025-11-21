@@ -14,7 +14,7 @@ const { Pool } = pkg
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-//data connection pool
+// data connection pool
 const pool = new Pool({
     host: process.env.PGHOST,
     port: Number(process.env.PGPORT) || 5432,
@@ -23,7 +23,7 @@ const pool = new Pool({
     database: process.env.PGDATABASE || "pixelsync_db"
 })
 
-//Creating storage and mock directories
+// creating storage and mock directories
 const storageRoot = path.resolve(__dirname, "..", "..", "storage", "mock")
 if (!fs.existsSync(storageRoot)) {
     fs.mkdirSync(storageRoot, { recursive: true })
@@ -251,8 +251,95 @@ app.post("/images/:id/crop", async (req, res) => {
     }
 })
 
+app.post("/sync", async (req, res) => {
+    try {
+        // Snapshot of current DB rows
+        const dbResult = await pool.query(
+            "SELECT id, filename, storage_path, is_corrupted FROM images"
+        )
+        const dbRows = dbResult.rows
 
-//port listening
+        // Snapshot of files that actually exist in storage
+        const diskFiles = fs
+            .readdirSync(storageRoot)
+            .filter(name => /\.(png|jpe?g|tiff?)$/i.test(name))
+            .map(name => ({
+                name,
+                fullPath: path.join(storageRoot, name)
+            }))
+
+        const diskByPath = new Map(diskFiles.map(f => [f.fullPath, f]))
+
+        let addedFromDisk = 0
+        let markedMissing = 0
+        let healed = 0
+
+        // Any file on disk that is not in DB becomes a new DB row
+        for (const file of diskFiles) {
+            const existsInDb = dbRows.some(r => r.storage_path === file.fullPath)
+            if (!existsInDb) {
+                const stats = fs.statSync(file.fullPath)
+                const ext = path.extname(file.name).toLowerCase()
+
+                let mime = "image/jpeg"
+                if (ext === ".png") mime = "image/png"
+                if (ext === ".tif" || ext === ".tiff") mime = "image/tiff"
+
+                const insertQuery = `
+          INSERT INTO images (filename, mime_type, size_bytes, storage_path, is_corrupted)
+          VALUES ($1, $2, $3, $4, $5)
+        `
+                const values = [
+                    file.name,
+                    mime,
+                    stats.size,
+                    file.fullPath,
+                    false
+                ]
+
+                await pool.query(insertQuery, values)
+                addedFromDisk++
+            }
+        }
+
+        // Any DB row whose file is gone is marked corrupted
+        // Any row that was corrupted but the file is back gets healed
+        for (const row of dbRows) {
+            const existsOnDisk = fs.existsSync(row.storage_path)
+
+            if (!existsOnDisk && !row.is_corrupted) {
+                await pool.query(
+                    "UPDATE images SET is_corrupted = true WHERE id = $1",
+                    [row.id]
+                )
+                markedMissing++
+            }
+
+            if (existsOnDisk && row.is_corrupted) {
+                await pool.query(
+                    "UPDATE images SET is_corrupted = false WHERE id = $1",
+                    [row.id]
+                )
+                healed++
+            }
+        }
+
+        res.json({
+            totalDbBefore: dbRows.length,
+            totalDisk: diskFiles.length,
+            addedFromDisk,
+            markedMissing,
+            healed
+        })
+    } catch (err) {
+        console.error(err)
+        res.status(500).json({ error: "Sync failed" })
+    }
+})
+
+
+
+// port listening
 const port = Number(process.env.PORT) || 4000
 app.listen(port, () => {
     console.log(`PixelSync API running on http://localhost:${port}`)
