@@ -1,7 +1,8 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain,OpenDialogOptions } from 'electron'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import fs from 'node:fs' 
 
 const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -66,3 +67,49 @@ app.on('activate', () => {
 })
 
 app.whenReady().then(createWindow)
+
+ipcMain.handle(
+  'pixelsync:export-images',
+  async (
+    event,
+    images: { path: string; filename: string }[]
+  ) => {
+    if (!images || images.length === 0) {
+      return { exported: 0, targetDir: null }
+    }
+
+    const win = BrowserWindow.getFocusedWindow()
+
+    
+
+    const options: OpenDialogOptions = {
+      title: "Choose export folder",
+      properties: ["openDirectory", "createDirectory"]
+    }
+
+    const result = win
+      ? await dialog.showOpenDialog(win, options)
+      : await dialog.showOpenDialog(options)
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return { exported: 0, targetDir: null }
+    }
+
+    const targetDir = result.filePaths[0]
+    let exported = 0
+
+    for (const img of images) {
+      try {
+        const exportName = `${Date.now()}_${img.filename}`
+        const destPath = path.join(targetDir, exportName)
+        fs.copyFileSync(img.path, destPath)
+        exported++
+      } catch (err) {
+        console.error('Export failed for', img.path, err)
+      }
+    }
+
+    return { exported, targetDir }
+  }
+)
+

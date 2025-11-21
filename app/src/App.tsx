@@ -16,6 +16,9 @@ type LogEntry = {
   message: string
 }
 
+
+
+
 function App() {
   const [images, setImages] = useState<ImageMeta[]>([])
   const [selectedImage, setSelectedImage] = useState<ImageMeta | null>(null)
@@ -291,6 +294,47 @@ function App() {
     })
   }
 
+  const handleExportSelected = async () => {
+    const ipc = (window as any).ipcRenderer
+
+    if (!ipc || typeof ipc.invoke !== "function") {
+      addLog("Export not available in this environment")
+      return
+    }
+
+    const selectedImages = images.filter(img => selectedIds.includes(img.id))
+
+    if (selectedImages.length === 0) {
+      addLog("No images selected for export")
+      return
+    }
+
+    try {
+      const result = await ipc.invoke(
+        "pixelsync:export-images",
+        selectedImages.map(img => ({
+          path: img.storage_path,
+          filename: img.filename
+        }))
+      )
+
+      if (!result || !result.targetDir) {
+        addLog("Export canceled")
+        return
+      }
+
+      addLog(
+        `Exported ${result.exported} file${
+          result.exported !== 1 ? "s" : ""
+        } to ${result.targetDir}`
+      )
+    } catch (err) {
+      console.error(err)
+      addLog("Export failed")
+    }
+  }
+
+
 
 
   const resetView = () => {
@@ -418,12 +462,21 @@ function App() {
                <span className="selected-info">
                 {selectedIds.length} selected
                 {selectedIds.length > 0 && (
-                  <button
-                    className="clear-selection"
-                    onClick={() => setSelectedIds([])}
-                  >
-                    Clear
-                  </button>
+                  <>
+                    <button
+                      className="clear-selection"
+                      onClick={() => setSelectedIds([])}
+                    >
+                      Clear
+                    </button>
+                    <button
+                      className="export-selection"
+                      onClick={handleExportSelected}
+                    >
+                      Export selected
+                    </button>
+                  </>
+                  
                 )}
               </span>
             </div>
