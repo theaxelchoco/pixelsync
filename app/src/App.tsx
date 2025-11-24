@@ -556,6 +556,10 @@ function App() {
                   }}
                   onDoubleClick={() => {
                     // double click selects + switches tab
+                    if (img.is_corrupted) {
+                      addLog(`Selected corrupted image: ${img.filename}`);
+                    }
+
                     setSelectedImage(img);
                     setImageReady(false);
                     setActiveTab("single");
@@ -582,116 +586,128 @@ function App() {
           </div>
         )}
 
-        {activeTab === "single" && selectedImage && (
-          <div className="single-viewer">
-            <div className="single-header">
-              <div>
-                <h3>{selectedImage.filename}</h3>
-                <p className="single-meta">
-                  {selectedImage.mime_type} ·{" "}
-                  {(selectedImage.size_bytes / 1024).toFixed(1)} KB
-                </p>
-              </div>
-              <div className="viewer-controls">
-                <button onClick={zoomOut}>−</button>
-                <span>{Math.round(zoom * 100)}%</span>
-                <button onClick={zoomIn}>+</button>
-                <button onClick={resetView}>Reset</button>
-                <button
-                  className={selectionMode ? "toggle active" : "toggle"}
-                  onClick={() => {
-                    setSelectionMode((prev) => !prev);
-                    setSelection(null);
-                    selectionStartRef.current = null;
-                    setIsPanning(false);
-                  }}
-                >
-                  {selectionMode ? "Selection on" : "Selection off"}
-                </button>
-                <button
-                  disabled={!selection}
-                  onClick={handleCreateFromSelection}
-                >
-                  Create image
-                </button>
-              </div>
+        {activeTab === "single" &&
+          selectedImage &&
+          (selectedImage.is_corrupted ? (
+            <div className="single-viewer empty">
+              <h3>{selectedImage.filename}</h3>
+              <p className="single-meta">
+                {selectedImage.mime_type} ·{" "}
+                {(selectedImage.size_bytes / 1024).toFixed(1)} KB
+              </p>
+              <p className="corrupted-message">
+                This image is marked as corrupted or missing on the server.
+              </p>
+              <p className="corrupted-message">
+                Restore the file in the server storage and run sync to heal it.
+              </p>
             </div>
-
-            <div
-              className={isPanning ? "viewer-canvas panning" : "viewer-canvas"}
-              ref={canvasRef}
-              onWheel={handleWheel}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
-            >
-              <div className="viewer-inner">
-                <img
-                  ref={imgRef}
-                  src={`${API_BASE}/files/${selectedImage.id}`}
-                  alt={selectedImage.filename}
-                  className="viewer-img"
-                  onLoad={() => {
-                    const img = imgRef.current;
-                    const canvas = canvasRef.current;
-                    if (!img || !canvas) return;
-
-                    // actual available space
-                    const canvasW = canvas.clientWidth;
-                    const canvasH = canvas.clientHeight;
-
-                    const imgW = img.naturalWidth || 1;
-                    const imgH = img.naturalHeight || 1;
-
-                    // small padding so it is not glued to the edges
-                    const padding = 24;
-                    const usableW = canvasW - padding;
-                    const usableH = canvasH - padding;
-
-                    const scale = Math.min(usableW / imgW, usableH / imgH);
-
-                    // clamp a little in case images are tiny or huge
-                    const clamped = Math.max(0.1, Math.min(scale, 3));
-
-                    setInitialZoom(clamped);
-                    setZoom(clamped);
-                    setOffset({ x: 0, y: 0 });
-
-                    setImageReady(true);
-                  }}
-                  style={{
-                    transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
-                    transformOrigin: "center center",
-                    opacity: imageReady ? 1 : 0,
-                    transition: "opacity 120ms ease-out",
-                  }}
-                  draggable={false}
-                />
+          ) : (
+            <div className="single-viewer">
+              <div className="single-header">
+                <div>
+                  <h3>{selectedImage.filename}</h3>
+                  <p className="single-meta">
+                    {selectedImage.mime_type} ·{" "}
+                    {(selectedImage.size_bytes / 1024).toFixed(1)} KB
+                  </p>
+                </div>
+                <div className="viewer-controls">
+                  <button onClick={zoomOut}>−</button>
+                  <span>{Math.round(zoom * 100)}%</span>
+                  <button onClick={zoomIn}>+</button>
+                  <button onClick={resetView}>Reset</button>
+                  <button
+                    className={selectionMode ? "toggle active" : "toggle"}
+                    onClick={() => {
+                      setSelectionMode((prev) => !prev);
+                      setSelection(null);
+                      selectionStartRef.current = null;
+                      setIsPanning(false);
+                    }}
+                  >
+                    {selectionMode ? "Selection on" : "Selection off"}
+                  </button>
+                  <button
+                    disabled={!selection || selectedImage?.is_corrupted}
+                    onClick={handleCreateFromSelection}
+                  >
+                    Create image
+                  </button>
+                </div>
               </div>
 
-              {selection && (
-                <div
-                  className="selection-rect"
-                  style={{
-                    left: selection.x,
-                    top: selection.y,
-                    width: selection.width,
-                    height: selection.height,
-                  }}
-                />
-              )}
+              <div
+                className={
+                  isPanning ? "viewer-canvas panning" : "viewer-canvas"
+                }
+                ref={canvasRef}
+                onWheel={handleWheel}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+              >
+                <div className="viewer-inner">
+                  <img
+                    ref={imgRef}
+                    src={`${API_BASE}/files/${selectedImage.id}`}
+                    alt={selectedImage.filename}
+                    className="viewer-img"
+                    onLoad={() => {
+                      const img = imgRef.current;
+                      const canvas = canvasRef.current;
+                      if (!img || !canvas) return;
+
+                      // actual available space
+                      const canvasW = canvas.clientWidth;
+                      const canvasH = canvas.clientHeight;
+
+                      const imgW = img.naturalWidth || 1;
+                      const imgH = img.naturalHeight || 1;
+
+                      // small padding so it is not glued to the edges
+                      const padding = 24;
+                      const usableW = canvasW - padding;
+                      const usableH = canvasH - padding;
+
+                      const scale = Math.min(usableW / imgW, usableH / imgH);
+
+                      // clamp a little in case images are tiny or huge
+                      const clamped = Math.max(0.1, Math.min(scale, 3));
+
+                      setInitialZoom(clamped);
+                      setZoom(clamped);
+                      setOffset({ x: 0, y: 0 });
+
+                      setImageReady(true);
+                    }}
+                    style={{
+                      transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
+                      transformOrigin: "center center",
+                      opacity: imageReady ? 1 : 0,
+                      transition: "opacity 120ms ease-out",
+                    }}
+                    draggable={false}
+                  />
+                </div>
+
+                {selection && (
+                  <div
+                    className="selection-rect"
+                    style={{
+                      left: selection.x,
+                      top: selection.y,
+                      width: selection.width,
+                      height: selection.height,
+                    }}
+                  />
+                )}
+              </div>
+
+              <p className="hint">Scroll to zoom. Drag to pan.</p>
             </div>
-
-            <p className="hint">Scroll to zoom. Drag to pan.</p>
-          </div>
-        )}
-
-        {activeTab === "single" && !selectedImage && (
-          <div className="single-viewer empty">
-            <p>Select an image from the gallery to view it here</p>
-          </div>
-        )}
+          ))}
       </div>
 
       {/* Bottom panel: logs */}
