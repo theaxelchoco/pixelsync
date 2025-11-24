@@ -1,11 +1,17 @@
-import { app, BrowserWindow, dialog, ipcMain,OpenDialogOptions } from 'electron'
-import { createRequire } from 'node:module'
-import { fileURLToPath } from 'node:url'
-import path from 'node:path'
-import fs from 'node:fs' 
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  OpenDialogOptions,
+} from "electron";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+import fs from "node:fs";
 
-const require = createRequire(import.meta.url)
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const require = createRequire(import.meta.url);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // The built directory structure
 //
@@ -16,100 +22,100 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // │ │ ├── main.js
 // │ │ └── preload.mjs
 // │
-process.env.APP_ROOT = path.join(__dirname, '..')
+process.env.APP_ROOT = path.join(__dirname, "..");
 
 // 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
-export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
-export const MAIN_DIST = path.join(process.env.APP_ROOT, 'dist-electron')
-export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
+export const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
+export const MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
+export const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
 
-process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
+process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
+  ? path.join(process.env.APP_ROOT, "public")
+  : RENDERER_DIST;
 
-let win: BrowserWindow | null
+let win: BrowserWindow | null;
 
 function createWindow() {
   win = new BrowserWindow({
-    icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
+    width: 1300,
+    height: 800,
+    minWidth: 1300,
+    minHeight: 800,
+    icon: path.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
     webPreferences: {
-      preload: path.join(__dirname, 'preload.mjs'),
+      preload: path.join(__dirname, "preload.mjs"),
     },
-  })
+  });
 
   // Test active push message to Renderer-process.
-  win.webContents.on('did-finish-load', () => {
-    win?.webContents.send('main-process-message', (new Date).toLocaleString())
-  })
+  win.webContents.on("did-finish-load", () => {
+    win?.webContents.send("main-process-message", new Date().toLocaleString());
+  });
 
   if (VITE_DEV_SERVER_URL) {
-    win.loadURL(VITE_DEV_SERVER_URL)
+    win.loadURL(VITE_DEV_SERVER_URL);
   } else {
     // win.loadFile('dist/index.html')
-    win.loadFile(path.join(RENDERER_DIST, 'index.html'))
+    win.loadFile(path.join(RENDERER_DIST, "index.html"));
   }
 }
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-    win = null
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    app.quit();
+    win = null;
   }
-})
+});
 
-app.on('activate', () => {
+app.on("activate", () => {
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow()
+    createWindow();
   }
-})
+});
 
-app.whenReady().then(createWindow)
+app.whenReady().then(createWindow);
 
 ipcMain.handle(
-  'pixelsync:export-images',
-  async (
-    event,
-    images: { path: string; filename: string }[]
-  ) => {
+  "pixelsync:export-images",
+  async (event, images: { path: string; filename: string }[]) => {
     if (!images || images.length === 0) {
-      return { exported: 0, targetDir: null }
+      return { exported: 0, targetDir: null };
     }
 
-    const win = BrowserWindow.getFocusedWindow()
-
-    
+    const win = BrowserWindow.getFocusedWindow();
 
     const options: OpenDialogOptions = {
       title: "Choose export folder",
-      properties: ["openDirectory", "createDirectory"]
-    }
+      properties: ["openDirectory", "createDirectory"],
+    };
 
     const result = win
       ? await dialog.showOpenDialog(win, options)
-      : await dialog.showOpenDialog(options)
+      : await dialog.showOpenDialog(options);
 
     if (result.canceled || result.filePaths.length === 0) {
-      return { exported: 0, targetDir: null }
+      return { exported: 0, targetDir: null };
     }
 
-    const targetDir = result.filePaths[0]
-    let exported = 0
+    const targetDir = result.filePaths[0];
+    let exported = 0;
 
     for (const img of images) {
       try {
-        const exportName = `${Date.now()}_${img.filename}`
-        const destPath = path.join(targetDir, exportName)
-        fs.copyFileSync(img.path, destPath)
-        exported++
+        const exportName = `${Date.now()}_${img.filename}`;
+        const destPath = path.join(targetDir, exportName);
+        fs.copyFileSync(img.path, destPath);
+        exported++;
       } catch (err) {
-        console.error('Export failed for', img.path, err)
+        console.error("Export failed for", img.path, err);
       }
     }
 
-    return { exported, targetDir }
+    return { exported, targetDir };
   }
-)
-
+);

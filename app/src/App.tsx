@@ -26,6 +26,9 @@ function App() {
   const [gallerySelectionMode, setGallerySelectionMode] = useState(false);
 
   const [zoom, setZoom] = useState(1);
+  const [initialZoom, setInitialZoom] = useState(1);
+  const [imageReady, setImageReady] = useState(false);
+
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
 
@@ -158,8 +161,8 @@ function App() {
 
     setZoom((prev) => {
       let next = prev * factor;
-      if (next < 0.2) next = 0.2;
-      if (next > 5) next = 5;
+      if (next < initialZoom * 0.25) next = initialZoom * 0.25;
+      if (next > initialZoom * 5) next = initialZoom * 5;
       return Number(next.toFixed(2));
     });
   };
@@ -285,6 +288,7 @@ function App() {
   ) => {
     // always update the "current" image for the viewer
     setSelectedImage(img);
+    setImageReady(false);
 
     setSelectedIds((prev) => {
       if (gallerySelectionMode) {
@@ -370,7 +374,7 @@ function App() {
   };
 
   const resetView = () => {
-    setZoom(1);
+    setZoom(initialZoom);
     setOffset({ x: 0, y: 0 });
   };
 
@@ -553,6 +557,7 @@ function App() {
                   onDoubleClick={() => {
                     // double click selects + switches tab
                     setSelectedImage(img);
+                    setImageReady(false);
                     setActiveTab("single");
                   }}
                 >
@@ -627,9 +632,39 @@ function App() {
                   src={`${API_BASE}/files/${selectedImage.id}`}
                   alt={selectedImage.filename}
                   className="viewer-img"
+                  onLoad={() => {
+                    const img = imgRef.current;
+                    const canvas = canvasRef.current;
+                    if (!img || !canvas) return;
+
+                    // actual available space
+                    const canvasW = canvas.clientWidth;
+                    const canvasH = canvas.clientHeight;
+
+                    const imgW = img.naturalWidth || 1;
+                    const imgH = img.naturalHeight || 1;
+
+                    // small padding so it is not glued to the edges
+                    const padding = 24;
+                    const usableW = canvasW - padding;
+                    const usableH = canvasH - padding;
+
+                    const scale = Math.min(usableW / imgW, usableH / imgH);
+
+                    // clamp a little in case images are tiny or huge
+                    const clamped = Math.max(0.1, Math.min(scale, 3));
+
+                    setInitialZoom(clamped);
+                    setZoom(clamped);
+                    setOffset({ x: 0, y: 0 });
+
+                    setImageReady(true);
+                  }}
                   style={{
                     transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
                     transformOrigin: "center center",
+                    opacity: imageReady ? 1 : 0,
+                    transition: "opacity 120ms ease-out",
                   }}
                   draggable={false}
                 />
