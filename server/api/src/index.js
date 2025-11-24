@@ -43,6 +43,25 @@ const storage = multer.diskStorage({
     }
 })
 
+async function analyzeImage(filePath) {
+    try {
+        const meta = await sharp(filePath).metadata()
+        return {
+            width: meta.width ?? null,
+            height: meta.height ?? null,
+            isCorrupted: false
+        }
+    } catch (err) {
+        console.error("Image analysis failed, marking as corrupted:", err)
+        return {
+            width: null,
+            height: null,
+            isCorrupted: true
+        }
+    }
+}
+
+
 const upload = multer({ storage })
 const multiUpload = multer({ storage })
 
@@ -74,30 +93,36 @@ app.post("/upload", upload.single("file"), async (req, res) => {
         const file = req.file
         if (!file) return res.status(400).json({ error: "No file uploaded" })
 
+        const analysis = await analyzeImage(file.path)
+
         const insertQuery = `
-      INSERT INTO images (filename, mime_type, size_bytes, storage_path, is_corrupted)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO images (filename, mime_type, size_bytes, width, height, storage_path, is_corrupted)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *
     `
         const values = [
             file.originalname,
             file.mimetype,
             file.size,
+            analysis.width,
+            analysis.height,
             file.path,
-            false
+            analysis.isCorrupted
         ]
 
         const result = await pool.query(insertQuery, values)
 
         res.status(201).json({
             message: "File uploaded",
-            image: result.rows[0]
+            image: result.rows[0],
+            corrupted: analysis.isCorrupted
         })
     } catch (err) {
         console.error(err)
         res.status(500).json({ error: "Upload failed" })
     }
 })
+
 
 app.post("/upload/batch", multiUpload.array("files", 50), async (req, res) => {
     try {
@@ -109,21 +134,27 @@ app.post("/upload/batch", multiUpload.array("files", 50), async (req, res) => {
 
         let totalSize = 0
         const insertedImages = []
+        let corruptedCount = 0
 
         for (const file of files) {
             totalSize += file.size
 
+            const analysis = await analyzeImage(file.path)
+            if (analysis.isCorrupted) corruptedCount++
+
             const insertQuery = `
-        INSERT INTO images (filename, mime_type, size_bytes, storage_path, is_corrupted)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO images (filename, mime_type, size_bytes, width, height, storage_path, is_corrupted)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *
       `
             const values = [
                 file.originalname,
                 file.mimetype,
                 file.size,
+                analysis.width,
+                analysis.height,
                 file.path,
-                false
+                analysis.isCorrupted
             ]
 
             const result = await pool.query(insertQuery, values)
@@ -134,7 +165,7 @@ app.post("/upload/batch", multiUpload.array("files", 50), async (req, res) => {
             message: "Batch upload complete",
             totalFiles: files.length,
             totalSize,
-            corruptedCount: 0, // placeholder for now
+            corruptedCount,
             images: insertedImages
         })
     } catch (err) {
@@ -142,6 +173,7 @@ app.post("/upload/batch", multiUpload.array("files", 50), async (req, res) => {
         res.status(500).json({ error: "Batch upload failed" })
     }
 })
+
 
 app.get("/files/:id", async (req, res) => {
     try {
@@ -285,16 +317,20 @@ app.post("/sync", async (req, res) => {
                 if (ext === ".png") mime = "image/png"
                 if (ext === ".tif" || ext === ".tiff") mime = "image/tiff"
 
+                const analysis = await analyzeImage(file.fullPath)
+
                 const insertQuery = `
-          INSERT INTO images (filename, mime_type, size_bytes, storage_path, is_corrupted)
-          VALUES ($1, $2, $3, $4, $5)
-        `
+  INSERT INTO images (filename, mime_type, size_bytes, width, height, storage_path, is_corrupted)
+  VALUES ($1, $2, $3, $4, $5, $6, $7)
+`
                 const values = [
                     file.name,
                     mime,
                     stats.size,
+                    analysis.width,
+                    analysis.height,
                     file.fullPath,
-                    false
+                    analysis.isCorrupted
                 ]
 
                 await pool.query(insertQuery, values)
