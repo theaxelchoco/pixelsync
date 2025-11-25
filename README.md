@@ -286,4 +286,9 @@ Crops a region of an existing image and creates a new one.
 - Conflict-aware merge strategy
 - Image tagging, searching, and sorting
 - Pagination for large sets
-- Installer packaging for Electron
+
+## Handling large-scale datasets (100k+ images)
+
+- The system seperates metadata from the files which already scales very well for larger libraries since we don't need to locally store each image.
+- To support 100k images, the gallery would have to use some form of virtualization to only render the visible thumbnails.
+- Sync performance can be improved by comparing file ID and timestamps rather than the entire storage
