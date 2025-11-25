@@ -501,9 +501,7 @@ function App() {
               }
               onClick={() => setGallerySelectionMode((prev) => !prev)}
             >
-              {gallerySelectionMode
-                ? "Selection mode on"
-                : "Selection mode off"}
+              {"Multi-select"}
             </button>
           </div>
         </div>
@@ -530,7 +528,7 @@ function App() {
                       className="export-selection"
                       onClick={handleExportSelected}
                     >
-                      Export selected
+                      Export
                     </button>
                   </>
                 )}
@@ -627,7 +625,7 @@ function App() {
                     disabled={!selection || selectedImage?.is_corrupted}
                     onClick={handleCreateFromSelection}
                   >
-                    Create image
+                    Crop
                   </button>
                 </div>
               </div>

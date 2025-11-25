@@ -231,6 +231,8 @@ body {
   padding: 0;
   background: transparent;
   border: none;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
 }
 
 .thumb-card .image-meta {
@@ -239,14 +241,15 @@ body {
   align-items: center;
 }
 
-.thumb-card:hover {
-  border-color: #4b5563;
-  background: #030712;
+.thumb-card:hover .thumb-wrapper {
+  transform: scale(1.04);
 }
 
-.thumb-card.selected {
-  border-color: #4f46e5;
-  box-shadow: 0 0 0 1px #4f46e5;
+.thumb-card.selected .thumb-wrapper {
+  transform: scale(1.04);
+  box-shadow:
+    0 0 0 3px #6366f1,
+    0 0 16px rgba(99, 102, 241, 0.6);
 }
 
 .corrupted-icon {
@@ -282,11 +285,12 @@ body {
 
 .thumb-wrapper {
   width: 100%;
-  aspect-ratio: 1/1;
+  aspect-ratio: 1 / 1;
   border-radius: 16px;
   overflow: hidden;
   background: #020617;
   position: relative;
+  transition: transform 150ms ease, box-shadow 150ms ease;
 }
 
 .thumb-img {
