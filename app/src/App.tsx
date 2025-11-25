@@ -572,14 +572,9 @@ function App() {
                       className="thumb-img"
                     />
                   </div>
-                  <div className="image-name">{img.filename}</div>
-                  <div className="image-meta">
-                    <span>{img.mime_type}</span>
-                    <span>{(img.size_bytes / 1024).toFixed(1)} KB</span>
-                    {img.is_corrupted && (
-                      <span className="badge">corrupted</span>
-                    )}
-                  </div>
+                  {img.is_corrupted && (
+                    <span className="corrupted-icon">!</span>
+                  )}
                 </button>
               ))}
             </div>
