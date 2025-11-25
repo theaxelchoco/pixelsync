@@ -4,6 +4,11 @@ PixelSync is an image management tool built with Electron, React, Node and Postg
 
 It simulates an imaging pipeline where the desktop client connects to a server-sided database and storage, keeps them in sync and lets the user review and export images.
 
+## Demo Video
+
+A complete demo of the application is available here:
+https://github.com/theaxelchoco/pixelsync/releases/tag/Demo
+
 ## Table of contents
 
 - [Architecture overview](#architecture-overview)
